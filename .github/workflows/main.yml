@@ -11,37 +11,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install google-chrome (if not present) and show version
+      - name: Install Chromium
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget gnupg2
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable || true
-          google-chrome --version || chromium-browser --version || true
-
-      - name: Install matching ChromeDriver
-        run: |
-          CHROME_BIN=$(which google-chrome || which chromium-browser || echo "")
-          if [ -z "$CHROME_BIN" ]; then
-            echo "No chrome binary found"
-            exit 1
-          fi
-          CHROME_VERSION_FULL=$($CHROME_BIN --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-          CHROME_MAJOR=$(echo "$CHROME_VERSION_FULL" | cut -d. -f1)
-          LATEST_DRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}")
-          if [ -z "$LATEST_DRIVER_VERSION" ]; then
-            LATEST_DRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
-          fi
-          wget -N "https://chromedriver.storage.googleapis.com/${LATEST_DRIVER_VERSION}/chromedriver_linux64.zip"
-          unzip -o chromedriver_linux64.zip
-          sudo mv -f chromedriver /usr/bin/chromedriver
-          sudo chmod +x /usr/bin/chromedriver
-          /usr/bin/chromedriver --version || true
+          sudo apt-get install -y chromium-browser
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -50,16 +26,8 @@ jobs:
           java-version: 17
           cache: maven
 
-      - name: Cache Maven repo
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-m2-
-
-      - name: Build & Run tests
+      - name: Build & Test
         env:
-          CHROME_BIN: $(which google-chrome || which chromium-browser || echo /usr/bin/google-chrome)
-          WEBDRIVER_CHROME_DRIVER: /usr/bin/chromedriver
-        run: mvn -B -DskipTests=false clean test
+          CHROME_BIN: /usr/bin/chromium-browser
+        run: |
+          mvn -q -B clean test
